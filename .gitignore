@@ -7,6 +7,10 @@ _archive/*
 scan-data-xml
 output
 .idea
+xml/*
+_xml/*
+output/*
+_output/*
 
 # Created by .ignore support plugin (hsz.mobi)
 ### JetBrains template
