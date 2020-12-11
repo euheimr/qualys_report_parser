@@ -3,26 +3,30 @@ __email__ = 'euhe@pm.me'
 
 import datetime
 from datetime import datetime
-
-from loguru import logger as log
 from pathlib import Path
 
 ''' Local imports '''
 import utils
 
+development = True
 api_url = 'qualysapi.qg3.apps.qualys.com'
-username = ''
-password = ''
+username = input('Enter username: ')
+password = input('Enter password: ')
 write_mode = False
+
+''' File path variables '''
 _base_path = Path.cwd().joinpath(
     str(datetime.date(datetime.now()))).joinpath('_xml')
 xml_input_path = str(_base_path.joinpath('input'))
 output_path = str(_base_path.joinpath('output'))
 
 remember_me = False
+
 ''' Time difference to use when downloading reports by date '''
 report_days_timedelta = 7
-''' Max retries to query the Qualys API for the same API request'''
+
+''' Max retries to query the Qualys API for the same API request or batch API 
+    request'''
 max_retries = 0
 
 
@@ -36,9 +40,10 @@ def main():
         days=int(report_days_timedelta)))
     scan_ids = {}
 
-    log.debug(f'API URL: {str(api_url)} \n'
-              f'Start Date: {str(_start_datetime)} \n'
-              f'End Date: {str(_end_datetime)}')
+    if development:
+        log.debug(f'API URL: {str(api_url)} \n'
+                  f'Start Date: {str(_start_datetime)} \n'
+                  f'End Date: {str(_end_datetime)}')
 
     try:
         ''' Downloads VM scans based on datetime'''
@@ -49,6 +54,9 @@ def main():
                                                    end_date=_end_datetime,
                                                    remember_me=remember_me):
             scan_ids[_id] = _title
+
+            if development:
+                log.debug(f'title:id {str(_id)}:{str(scan_ids[_id])}')
 
     except Exception as ex:
         log.exception(f'Could not retrieve VM Scans: {str(ex)}')
@@ -86,4 +94,7 @@ def main():
 
 
 if __name__ == '__main__':
+    if development:
+        from loguru import logger as log
+
     main()

@@ -4,7 +4,11 @@ __email__ = 'euhe@pm.me'
 from pathlib import Path
 from datetime import datetime
 from loguru import logger as log
-from lxml import objectify, etree
+#from lxml import objectify, etree
+import xmltodict
+# Use the defusedxml package for all xml parsing. See bandit docs:
+# https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html#b405-import-xml-etree
+from defusedxml.ElementTree import fromstring
 import pandas as pd
 
 import qualysapi as api
@@ -23,6 +27,11 @@ _output_path = str(_base_path.joinpath('output'))
 ''' _write_mode can be `print`, `csv`, `json`, or `all`. '''
 _write_mode = 'print'
 _max_retries = 0
+
+
+def parse_cli_args():
+
+    return
 
 
 # def get_dtd(url, api_type):
@@ -149,18 +158,45 @@ def get_vm_scans_list(url='qualysapi.qualys.com',
 
 def get_xml_header_title(xml_data=None, file_path=None):
     if xml_data:
-        with objectify.parse(str(xml_data)).getroot() as xml_root:
+        with xmltodict.parse(str(xml_data)).getroot() as xml_root:
             for key in xml_root.find('HEADER'):
                 yield key.findtext('TITLE')
 
     elif Path.is_file(file_path):
-        with objectify.parse(open(file_path)).getroot() as root:
+        with xmltodict.parse(open(file_path)).getroot() as root:
             for key in root.find('HEADER'):
                 yield key.findtext('TITLE')
 
     else:
         log.error(f'Failed to get scans data Title. ')
         return False
+
+
+def parse_xml_element(element=None, parsed=None):
+    '''
+        Collect {key:attribute} and {tag:text} from this XML element and all
+        of it's children into a single dictionary of strings.
+
+    :param element: XML element
+    :param parsed:
+    :return: parsed XML element flattened into a dict type object
+    :rtype: dict
+    '''
+    if parsed is None:
+        parsed = dict()
+
+    for key in element.keys():
+        if key not in parsed:
+            parsed[key] = element.attrib.get(key)
+        if element.text:
+            parsed[element.tag] = element.text
+        else:
+            raise ValueError(f'Duplicate attribute {key} at element '
+                             f'{element.getroottree().getpath(element)}')
+    ''' Apply recursion '''
+    for child in list(element):
+        parse_xml_element(child, parsed)
+    return parsed
 
 
 def parse_root(root=None, include=None, skip_fields=None):
@@ -173,7 +209,8 @@ def parse_root(root=None, include=None, skip_fields=None):
     :param list skip_fields: If None, no fields are skipped. If `skip_fields`
     has a string or list, we return all elements except the `skip_fields`
     fields.
-    :return: list - data
+    :return: data
+    :rtype list:
     '''
     if root is not None:
         if include is not None:
@@ -211,7 +248,6 @@ def parse_root(root=None, include=None, skip_fields=None):
                         continue
                     el_data[child.tag] = child.pyval
                 data.append(el_data)
-
             return data
 
     if root is not None:
@@ -223,32 +259,6 @@ def parse_root(root=None, include=None, skip_fields=None):
         log.error(f'`root` parameter input is invalid.')
 
 
-def parse_xml_element(element=None, parsed=None):
-    '''
-        Collect {key:attribute} and {tag:text} from this XML element and all
-        of it's children into a single dictionary of strings.
-
-    :param element:
-    :param parsed:
-    :return:
-    '''
-    if parsed is None:
-        parsed = dict()
-
-    for key in element.keys():
-        if key not in parsed:
-            parsed[key] = element.attrib.get(key)
-        if element.text:
-            parsed[element.tag] = element.text
-        else:
-            raise ValueError(f'Duplicate attribute {key} at element '
-                             f'{element.getroottree().getpath(element)}')
-    ''' Apply recursion '''
-    for child in list(element):
-        parse_xml_element(child, parsed)
-    return parsed
-
-
 def parse_xml_report(xml_file_directory=None):
     '''
         Recursively parses a a single or multiple XML files in a given
@@ -256,8 +266,9 @@ def parse_xml_report(xml_file_directory=None):
         xml_data is not None.
         Returns False on failure to parse
 
-    :param str directory: A file path
+    :param str xml_file_directory: A file path
     :return: Pandas DataFrame master_df converted from raw XML data
+    :rtype: DataFrame
     '''
 
     headers_df = pd.DataFrame()
