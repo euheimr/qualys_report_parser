@@ -6,11 +6,16 @@ _archive/*
 *.xml
 scan-data-xml
 output
+output/*
 .idea
 xml/*
 _xml/*
 output/*
 _output/*
+inv/*
+inv_json/*
+*.csv
+*.json
 
 # Created by .ignore support plugin (hsz.mobi)
 ### JetBrains template
